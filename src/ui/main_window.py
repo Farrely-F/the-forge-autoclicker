@@ -6,7 +6,7 @@ The primary application window with auto-clicker controls.
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QPushButton, QLabel, QSpinBox, QRadioButton, QButtonGroup,
-    QGroupBox, QFrame, QMessageBox, QStatusBar
+    QGroupBox, QFrame, QMessageBox, QStatusBar, QComboBox
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon, QPalette, QColor
@@ -48,8 +48,8 @@ class MainWindow(QMainWindow):
         self._setup_timers()
         self._setup_hotkeys()
         
-        # Initial window detection
-        self._detect_window()
+        # Initial window detection - populate dropdown
+        self._refresh_windows()
     
     def _setup_window(self):
         """Configure main window properties"""
@@ -68,13 +68,18 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self._central)
         
         # ===== Target Window Section =====
-        self._window_group = QGroupBox("Target Window Status")
+        self._window_group = QGroupBox("Target Window")
         self._window_status_indicator = QLabel("●")
         self._window_status_indicator.setFont(QFont("Segoe UI", 16))
-        self._window_status_label = QLabel("Searching for Roblox...")
+        self._window_status_label = QLabel("Searching...")
         self._window_status_label.setFont(QFont("Segoe UI", 10))
+        
+        # Window selector dropdown
+        self._window_selector = QComboBox()
+        self._window_selector.setMinimumWidth(200)
+        self._window_selector.addItem("🔍 Auto-detect (Roblox/The Forge)", "auto")
+        
         self._refresh_btn = QPushButton("Refresh")
-        self._refresh_btn.setFixedWidth(80)
         
         # ===== Click Interval Section =====
         self._interval_group = QGroupBox("Click Interval (ms)")
@@ -132,10 +137,18 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(20, 20, 20, 20)
         
         # Target Window Section
-        window_layout = QHBoxLayout()
-        window_layout.addWidget(self._window_status_indicator)
-        window_layout.addWidget(self._window_status_label, 1)
-        window_layout.addWidget(self._refresh_btn)
+        window_layout = QVBoxLayout()
+        
+        # Top row: indicator + status + refresh button
+        top_row = QHBoxLayout()
+        top_row.addWidget(self._window_status_indicator)
+        top_row.addWidget(self._window_status_label, 1)
+        top_row.addWidget(self._refresh_btn)
+        window_layout.addLayout(top_row)
+        
+        # Selector row: dropdown
+        window_layout.addWidget(self._window_selector)
+        
         self._window_group.setLayout(window_layout)
         main_layout.addWidget(self._window_group)
         
@@ -292,7 +305,10 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         """Connect widget signals to slots"""
         self._toggle_btn.clicked.connect(self._on_toggle_clicked)
-        self._refresh_btn.clicked.connect(self._detect_window)
+        self._refresh_btn.clicked.connect(self._refresh_windows)
+        
+        # Window selector
+        self._window_selector.currentIndexChanged.connect(self._on_window_selected)
         
         # Preset buttons
         self._slow_btn.clicked.connect(lambda: self._set_interval(500))
@@ -337,13 +353,60 @@ class MainWindow(QMainWindow):
         )
         self._hotkey_manager.start()
     
-    def _detect_window(self):
-        """Detect Roblox window"""
-        window = self._window_detector.find_roblox_window()
-        if window:
-            self._update_window_status(True, window.title)
+    def _refresh_windows(self):
+        """Refresh the window list in dropdown"""
+        # Store current selection
+        current_data = self._window_selector.currentData()
+        
+        # Block signals during update
+        self._window_selector.blockSignals(True)
+        self._window_selector.clear()
+        
+        # Add auto-detect option
+        self._window_selector.addItem("🔍 Auto-detect (Roblox/The Forge)", "auto")
+        
+        # Add all available windows
+        windows = self._window_detector.get_all_windows()
+        for window in windows:
+            # Truncate long titles
+            display_title = window.title[:50] + "..." if len(window.title) > 50 else window.title
+            self._window_selector.addItem(f"📋 {display_title}", window.window_id)
+        
+        # Restore selection if possible
+        if current_data:
+            for i in range(self._window_selector.count()):
+                if self._window_selector.itemData(i) == current_data:
+                    self._window_selector.setCurrentIndex(i)
+                    break
+        
+        self._window_selector.blockSignals(False)
+        
+        # Perform detection/selection
+        self._on_window_selected()
+    
+    def _on_window_selected(self):
+        """Handle window selection from dropdown"""
+        selected_data = self._window_selector.currentData()
+        
+        if selected_data == "auto":
+            # Auto-detect mode
+            window = self._window_detector.find_roblox_window()
+            if window:
+                self._update_window_status(True, window.title)
+            else:
+                self._update_window_status(False)
         else:
-            self._update_window_status(False)
+            # Manual window selection
+            if self._window_detector.select_window_by_id(selected_data):
+                window = self._window_detector.current_window
+                if window:
+                    self._update_window_status(True, window.title)
+            else:
+                self._update_window_status(False)
+    
+    def _detect_window(self):
+        """Detect window based on current selector state"""
+        self._on_window_selected()
     
     def _on_toggle_clicked(self):
         """Handle start/stop toggle"""

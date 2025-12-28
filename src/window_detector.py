@@ -93,6 +93,44 @@ class WindowDetector:
         self._current_window = None
         return None
     
+    def get_all_windows(self) -> List[WindowHandle]:
+        """
+        Get all available windows for user selection.
+        Returns a list of WindowHandle objects.
+        """
+        return self._enumerate_windows()
+    
+    def select_window(self, window: WindowHandle) -> bool:
+        """
+        Manually select a window as the target.
+        
+        Args:
+            window: The WindowHandle to select
+            
+        Returns:
+            True if window is valid and selected
+        """
+        if self.is_window_valid(window):
+            self._current_window = window
+            self._update_window_geometry(window)
+            return True
+        return False
+    
+    def select_window_by_id(self, window_id: str) -> bool:
+        """
+        Select a window by its ID.
+        
+        Args:
+            window_id: The window ID string
+            
+        Returns:
+            True if window found and selected
+        """
+        for window in self._enumerate_windows():
+            if window.window_id == window_id:
+                return self.select_window(window)
+        return False
+    
     def _enumerate_windows(self) -> List[WindowHandle]:
         """Enumerate all windows using wmctrl"""
         windows = []
