@@ -1,0 +1,12 @@
+{
+  "click_interval_ms": 200,
+  "intensity_pattern": "constant",
+  "mouse_button": "left",
+  "hotkey_toggle": "ctrl+shift+s",
+  "hotkey_emergency_stop": "escape",
+  "pause_on_minimize": true,
+  "confirm_before_start": true,
+  "start_minimized": false,
+  "auto_start": false,
+  "max_runtime_minutes": 0
+}
